@@ -7,18 +7,22 @@ A connected pipeline on synthetic Delhivery parcel data. It estimates delivery h
 
 Run every command from the repository root, in this order. Tested with Python 3.14.4, pandas 3.1.0, numpy 2.5.4, scikit-learn 1.9.1 and joblib 1.6.0 (pinned in requirements.txt).
 
+
+```powershell
 git clone https://github.com/saurabhchaudhary0506-bot/Capstone-Project-.git
 cd Capstone-Project-
 python -m venv .venv
-.venv\Scripts\activate          # Windows PowerShell (Mac/Linux: source .venv/bin/activate)
+.venv\Scripts\activate
 pip install -r requirements.txt
-python generate_data.py         # must print: 24 1224 48
+python generate_data.py
 python part_a_clean_eda.py
 python part_b_regression.py
 python part_c_classification.py
 python part_d_segments.py
 python package_model.py
 python predict_delay.py
+```
+
 
 ### Notes
 
@@ -50,7 +54,7 @@ Cleaning summary (from part_a_checks.csv): 1,224 raw rows, 24 exact duplicates r
 Source files: outputs/part_b_metrics.csv, part_b_tree_depth.csv, part_b_gb_learning_rate.csv, part_b_cv.csv, part_b_checks.csv.
 
 Split and leakage check: 840 / 180 / 180 rows. The scaler was fitted on training rows only: the largest absolute column mean is about 0 on the scaled training rows and 0.2187 on the scaled test rows.
-Baseline: predicting the training mean for every parcel gives a validation R² of -0.0212. That is slightly below zero: it explains none of the variation in delivery hours, so any real model has to beat it.
+Baseline: predicting the training mean for every parcel gives a validation R² of -0.0212. Its negative R² means it performs slightly worse than the training-mean baseline on the validation set.
 Validation winner: linear regression had the lowest validation RMSE, 4.8912 hours (R² 0.9313). Gradient boosting was almost tied at 4.9165 hours (R² 0.9306). Random forest scored 5.4680 hours (R² 0.9141) and the decision tree 6.2796 hours (R² 0.8867).
 Bias and variance (tree depth): the gap is validation RMSE minus training RMSE.
 
@@ -70,9 +74,13 @@ Bias and variance (tree depth): the gap is validation RMSE minus training RMSE.
 Depths 1 and 2 are high-bias: both errors are high and close together, so the tree is too simple to learn the pattern. Depths 12 and unlimited are high-variance: training error falls towards 0 while validation error rises, a gap of 6.0560 and 7.7890, so the tree memorises the training rows. Depth 8 is a transition case (gap 3.5025, validation RMSE already rising). Depth 6 is the sweet spot with the lowest validation RMSE (6.2796), and it is the depth used for the decision tree in the model comparison.
 
 Learning rate (gradient boosting, 100 trees): 0.1 was best (validation R² 0.9306, RMSE 4.9165). At 0.01 the model learns too slowly: 100 small steps are not enough to get close, and R² is only 0.7127 (RMSE 10.0018). At 1.0 each tree takes a full-size step and overshoots, so the ensemble becomes unstable and R² drops to 0.8440 (RMSE 7.3701).
+
 Cross-validation (5-fold, one shared KFold object, 1,020 training-plus-validation rows): linear regression has a mean R² of 0.9261 (std 0.0048) and gradient boosting 0.9352 (std 0.0044). The cross-validation ranking therefore disagrees with the validation ranking.
+
 Which model I would ship: gradient boosting. The validation ranking rests on one 180-row split, where the two models differ by only 0.0007 in R². The cross-validation average uses all 1,020 rows across five different splits, so it is the more reliable comparison, and it favours gradient boosting by 0.0091 R² with a similar spread. The delivery-hours process also contains interactions (for example the sale-window effect on Express parcels, and long-distance lanes in rain) that a linear model cannot represent but a boosted tree can. The margin is small, so this is not a strong preference; linear regression is a sound fallback because it is simpler to maintain.
+
 Final test score, stated honestly: following the validation rule, the validation winner (linear regression) was scored once on the 180 test rows: R² 0.9493, RMSE 4.5235 hours, MAE 3.5671 hours. That test score belongs to linear regression, not to the gradient boosting model I would ship. I did not score gradient boosting on the test rows, because choosing a model after looking at test results would make the test set no longer independent. The test score is a guide to the accuracy level of this model family, not a measured result for gradient boosting.
+
 Scope note: the packaged production model (Part D) is the delay classifier, not a regression model, so this regression recommendation does not change the scoring script.
 
 ### Classification
@@ -80,12 +88,19 @@ Scope note: the packaged production model (Part D) is the delay classifier, not 
 Source files: outputs/part_c_models.csv, part_c_feature_scores.csv, part_c_selectk.csv, part_c_tuning.csv, part_c_thresholds.csv, part_c_final_test.csv, part_c_final_config.csv.
 
 Split: stratified 840 / 180 / 180 rows, with 195 / 42 / 41 delayed parcels in train / validation / test.
+
 Blind baseline: predicting "not delayed" for every parcel scores an accuracy of 0.7667 on validation (TN 138, FP 0, FN 42, TP 0). It looks decent but catches none of the 42 delayed parcels (recall 0), so it is useless for the operations goal. Because about 23% of parcels are delayed, accuracy alone hides this. The trained models reach 0.8833-0.9056 accuracy: logistic regression F1 0.8046, decision tree (depth 6) F1 0.7470, default random forest F1 0.7848.
+
 Noise columns: the five bookkeeping columns hold a combined 0.2244 of the forest's feature importance (an average of about 0.045 each), so the forest spreads importance onto columns that carry no signal. The F-score separates signal from noise much more cleanly: the noise columns score 4.5847, 1.9052, 1.2776, 0.1393 and 0.0230, and their ranks are 8, 12, 14, 16 and 17, so all five fall outside the top 7. The seven columns ranked 1-7 are distance_km, hub_tier, hub_daily_capacity, n_stops, promised_hours, rain_flag and sale_event_flag, and the smallest of their F-scores is 36.7281.
+
 What the k table shows: validation F1 is 0.6988 for k = 5, 0.8333 for k = 7, 0.7857 for k = 10, 0.8049 for k = 12 and 0.7848 for k = 17. k = 7 is best: with k = 5 two real signal columns are dropped, and from k = 10 upwards noise columns come back in and the score falls. Differences of about 0.02 correspond to only a few parcels, so I read this as "k = 7 is clearly better than 5, and about as good as or better than the larger sets", not as a precise ranking.
-Tuning did not beat the untuned forest. Grid search (27 candidates, 135 fits) reached a best cross-validated accuracy of 0.8952 and randomized search (9 candidates, 45 fits) 0.8905, but their validation F1 scores were 0.7750 and 0.7848, below the untuned forest on the same 7 columns (0.8333). A better cross-validated accuracy therefore did not carry over to validation F1. With only 42 delayed parcels in a 180-row validation set, one parcel moves F1 by a couple of points, so differences between these three rows are largely noise and I would not read them as proof that tuning is harmful. Following the selection rule (highest validation F1), the untuned forest (default_forest_same_7_features: 100 trees, no depth limit, min_samples_leaf 1) was chosen.
+
+Tuning did not beat the untuned forest. Grid search (27 candidates, 135 fits) reached a best cross-validated accuracy of 0.8952 and randomized search (9 candidates, 45 fits) 0.8905, but their validation F1 scores were 0.7750 and 0.7848, below the untuned forest on the same 7 columns (0.8333). A better cross-validated accuracy therefore did not carry over to validation F1. With only 42 delayed parcels in a 180-row validation set, one parcel moves F1 by a couple of points, so differences between these three rows are largely noise and I would not read them as proof that tuning is harmful.Following the tie rule, the untuned forest was selected because it achieved the highest validation F1 among the compared models.
+
 Alert threshold: on the validation rows recall is 0.9762 at 0.1, 0.9286 at 0.2 and 0.3, 0.8810 at 0.4, 0.8333 at 0.5, and 0.7619 at 0.6, so the highest threshold with recall of at least 0.80 is 0.5. At 0.5 the model flags 44 parcels: 35 are truly delayed (precision 0.7955) and 7 delayed parcels are missed (recall 0.8333). Raising the threshold to 0.6 would lift precision to 0.8889 but recall would fall to 0.7619, below the operations rule, because a missed delayed parcel costs more than an unnecessary call. Lowering it to 0.4 would catch more (recall 0.8810) but precision falls to 0.7400.
+
 Test result (scored once, at threshold 0.5): precision 0.6889, recall 0.7561 and F1 0.7209 (TN 125, FP 14, FN 10, TP 31, accuracy 0.8667). Of every 10 parcels flagged, about 7 are really delayed, and of every 10 delayed parcels about 7.6 are caught. Test recall (0.7561) is lower than validation recall (0.8333), so on the test rows the model did not reach the 0.80 target the threshold was chosen for. The test set has only 41 delayed parcels, so one parcel is worth 0.0244 of recall and the gap is about 3 parcels, which is within what random variation can explain. It is also what we expect when a threshold is picked on one validation split, because that choice is slightly optimistic for the validation rows. Test precision (0.6889) is also lower than validation precision (0.7955). I did not re-tune after seeing the test result.
+
 Final configuration (part_c_final_config.csv): SelectKBest with k = 7, random forest with 100 trees, no depth limit, min_samples_leaf 1, threshold 0.5, chosen from default_forest_same_7_features.
 
 ## Operations recommendation
@@ -162,9 +177,13 @@ These trigger values are my own proposals, set from the historical figures above
 #### (c) Retraining schedule, sale window and drift
 
 Schedule: check the four monitors weekly, retrain every quarter, and retrain earlier if monitor 1 or 3 fires. Each retrain uses all newly labelled outcomes, re-fits the selector, forest, medians and alert threshold on a fresh split, and re-runs package_model.py; the new pickle must be created on the pinned scikit-learn version.
+
 Sale window (15-28 September, sale_event_flag = 1): in this data sale-period parcels take longer, and Express parcels are hit hardest. Delay and flag rates should therefore be compared with the same window in the previous sale period, not with ordinary weeks, otherwise a normal sale-time rise would raise a false alarm and a poor sale-time model would be hidden by the average.
+
 What data drift would look like here: longer average lanes or more stops per route (the strongest delay drivers); a change in the service mix (for example more Express parcels); new hubs or hubs whose behaviour changes, so that the segments no longer match, which is already the case for four hubs and their tier labels; a rise in missing payment modes or declared values; and a drift in the share of delayed parcels while the model's flagged share stays flat.
+
 Limitations
+
 Synthetic data. Every row comes from generate_data.py, so relationships are cleaner than in real logistics data. The accuracy figures here should not be expected to carry over to real operations.
 Small evaluation sets. Validation and test each have 180 parcels, and the test set contains only 41 delayed parcels, so precision, recall and F1 on it are noisy. A change of a few parcels moves them noticeably, as the drop from validation recall (0.8333) to test recall (0.7561) shows.
 Choices made on one split. The decision-tree depth, the choice of k = 7, the model ranking and the alert threshold were chosen on a single 180-row validation split, so they can shift with a different split (the regression ranking already disagrees between validation and cross-validation).
