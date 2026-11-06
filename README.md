@@ -182,7 +182,7 @@ Sale window (15-28 September, sale_event_flag = 1): in this data sale-period par
 
 What data drift would look like here: longer average lanes or more stops per route (the strongest delay drivers); a change in the service mix (for example more Express parcels); new hubs or hubs whose behaviour changes, so that the segments no longer match, which is already the case for four hubs and their tier labels; a rise in missing payment modes or declared values; and a drift in the share of delayed parcels while the model's flagged share stays flat.
 
-Limitations
+## Limitations
 
 Synthetic data. Every row comes from generate_data.py, so relationships are cleaner than in real logistics data. The accuracy figures here should not be expected to carry over to real operations.
 Small evaluation sets. Validation and test each have 180 parcels, and the test set contains only 41 delayed parcels, so precision, recall and F1 on it are noisy. A change of a few parcels moves them noticeably, as the drop from validation recall (0.8333) to test recall (0.7561) shows.
